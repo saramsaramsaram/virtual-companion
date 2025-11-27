@@ -295,11 +295,26 @@ public class UnifiedAIManager : MonoBehaviour
         }
 
         string cleanResponse = Regex.Replace(responseText, @"\[.*?\]", "").Trim();
+        
+        if (characterAnimator != null)
+        {
+            string talkStateName = $"{emotion}_Talk";
+            Debug.Log(talkStateName);
+            if (characterAnimator.HasState(0, Animator.StringToHash(talkStateName)))
+            {
+                characterAnimator.Play(talkStateName, 0, 0f);
+            }
+            else
+            {
+                characterAnimator.Play("Idle", 0, 0f);
+            }
+        }
+        
         if (outputText != null)
         {
             StartCoroutine(TypeTextCoroutine(cleanResponse));
         }
-        float talkDuration = Mathf.Clamp(cleanResponse.Length * 0.05f, 1f, 5f);
+        float talkDuration = Mathf.Clamp(cleanResponse.Length * 0.07f, 1f, 1000f);
         StartCoroutine(StopTalkingAfterDelay(talkDuration)); 
     }
 
@@ -338,13 +353,17 @@ public class UnifiedAIManager : MonoBehaviour
                 }
                 int blendShapeIndex = characterMeshRenderer.sharedMesh.GetBlendShapeIndex(pair.name);
                 float targetWeight = pair.weight / 100.0f;
-                ExpressionKey expressionKey = ExpressionKey.CreateCustom(pair.name); 
-                vrmInstance.Runtime.Expression.SetWeight(expressionKey, targetWeight);
                 
-                characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight); 
+
+                if (blendShapeIndex >= 0)
+                {
+                    ExpressionKey expressionKey = ExpressionKey.CreateCustom(pair.name); 
+                    vrmInstance.Runtime.Expression.SetWeight(expressionKey, targetWeight);
                     
-                //Debug.Log($"VRM Setting: {pair.name} to {targetWeight}");
-                
+                    characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight); 
+                    
+                    //Debug.Log($"VRM Setting: {pair.name} to {targetWeight}");
+                }
             }
         }
     }
@@ -402,5 +421,11 @@ public class UnifiedAIManager : MonoBehaviour
     IEnumerator StopTalkingAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
+
+        if (characterAnimator != null)
+        {
+            Debug.Log("Idle");
+            characterAnimator.Play("Idle", 0, 0f);
+        }
     }
 }
