@@ -200,7 +200,7 @@ public class UnifiedAIManager : MonoBehaviour
     {
         if (isAITalking || string.IsNullOrWhiteSpace(inputField.text)) return;
         string userInput = inputField.text;
-        outputText.text = $"🤖 {aiName} 생각 중...";
+        outputText.text = $"{aiName} 생각 중...";
         inputField.text = ""; 
         SendChatMessage(userInput);
     }
@@ -317,8 +317,12 @@ public class UnifiedAIManager : MonoBehaviour
     {
         if (vrmInstance == null || characterMeshRenderer == null || characterMeshRenderer.sharedMesh == null || blendShapeMap == null) return;
         int blendShapeCount = characterMeshRenderer.sharedMesh.blendShapeCount;
+
         for (int i = 0; i < blendShapeCount; i++)
         {
+            string blendShapeName = characterMeshRenderer.sharedMesh.GetBlendShapeName(i);
+            ExpressionKey expressionKey = ExpressionKey.CreateCustom(blendShapeName);
+            vrmInstance.Runtime.Expression.SetWeight(expressionKey, 0f);
             characterMeshRenderer.SetBlendShapeWeight(i, 0f); 
         }
         
@@ -371,7 +375,7 @@ public class UnifiedAIManager : MonoBehaviour
 
     private string ExtractEmotion(string responseText)
     {
-        //Debug.Log(responseText);
+        Debug.Log(responseText);
         Match match = Regex.Match(responseText, @"\[(.*?)\]");
         if (match.Success)
         {
