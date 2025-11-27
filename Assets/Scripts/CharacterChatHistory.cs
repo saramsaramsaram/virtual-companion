@@ -8,12 +8,24 @@ using File = System.IO.File;
 
 public class MainMenuController : MonoBehaviour
 {
+    private const string DialogueSceneName = "ChatScene"; 
+    
+    public List<CharacterDataAsset> allCharacterDataAssets; 
+
     private string saveDirectory;
     public GameObject characterButtonPrefab;
     public Transform contentParent;
 
+    private Dictionary<string, CharacterDataAsset> nameToDataMap;
+    
     private void Start()
     {
+        nameToDataMap = new Dictionary<string, CharacterDataAsset>();
+        foreach (var data in allCharacterDataAssets)
+        {
+            nameToDataMap[data.aiName.Replace("_", " ")] = data;
+        }
+
         saveDirectory = Application.persistentDataPath; 
         LoadCharacterSummaries();
     }
@@ -24,30 +36,30 @@ public class MainMenuController : MonoBehaviour
         
         List<CharacterSummary> summaries = new List<CharacterSummary>();
         
-        string[] allFiles = Directory.GetFiles(saveDirectory, "*.txt");
-        
-        foreach (string filePath in allFiles)
+        foreach (var dataAsset in allCharacterDataAssets) 
         {
-            string fileName = Path.GetFileName(filePath);
-            
-            Match nameMatch = Regex.Match(fileName, @"(.*?)_chat_log\.txt"); 
-            
-            if (nameMatch.Success)
-            {
-                string lastResponse = GetLastAIResponse(filePath);
-                
-                if (!string.IsNullOrEmpty(lastResponse))
-                {
-                    CharacterSummary summary = new CharacterSummary
-                    {
-                        name = nameMatch.Groups[1].Value.Replace("_", " "),
-                        saveFileName = fileName,
+            string characterNameKey = dataAsset.aiName.Replace("_", " ");
+            string safeName = Regex.Replace(dataAsset.aiName, @"[^a-zA-Z0-9가-힣]", "_");
+            string expectedFileName = $"{safeName}_chat_log.txt";
+            string filePath = Path.Combine(saveDirectory, expectedFileName);
 
-                        lastResponse = TruncateString(lastResponse, 10)
-                    };
-                    summaries.Add(summary);
-                }
+            string lastResponse = null;
+            bool fileExists = File.Exists(filePath);
+            
+            if (fileExists)
+            {
+                lastResponse = GetLastAIResponse(filePath);
             }
+            
+            CharacterSummary summary = new CharacterSummary
+            {
+                name = characterNameKey,
+                saveFileName = expectedFileName,
+                lastResponse = fileExists && !string.IsNullOrEmpty(lastResponse) 
+                               ? TruncateString(lastResponse, 10) 
+                               : "새 대화 시작..."
+            };
+            summaries.Add(summary);
         }
         
         DisplaySummaries(summaries);
@@ -97,14 +109,23 @@ public class MainMenuController : MonoBehaviour
             nameText.text = summary.name;
             lastResponseText.text = summary.lastResponse;
             
-            button.onClick.AddListener(() => LoadCharacterScene(summary.saveFileName, summary.name));
+            button.onClick.AddListener(() => LoadCharacterScene(summary.name));
         }
     }
     
-    private void LoadCharacterScene(string fileName, string name)
+    private void LoadCharacterScene(string _name)
     {
-        Debug.Log(name);
-        SceneManager.LoadScene(name);
-        Debug.Log($"Loading scene for character file: {fileName}");
+        if (nameToDataMap.TryGetValue(_name, out CharacterDataAsset selectedData))
+        {
+            PlayerPrefs.SetString("LAST_CHARACTER_AI_NAME", selectedData.aiName);
+            PlayerPrefs.Save();
+
+            SceneManager.LoadScene(DialogueSceneName);
+            Debug.Log($"Loading single scene '{DialogueSceneName}' for character: {_name} ({selectedData.aiName})");
+        }
+        else
+        {
+            Debug.LogError($"Character data asset not found for: {_name}");
+        }
     }
 }
