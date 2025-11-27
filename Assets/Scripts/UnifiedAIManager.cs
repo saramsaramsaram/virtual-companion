@@ -3,6 +3,7 @@ using UnityEngine.Networking;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using UniVRM10;
 using TMPro; 
 using System.Text.RegularExpressions; 
 using System.IO; 
@@ -23,6 +24,7 @@ public class UnifiedAIManager : MonoBehaviour
     
     private string systemInstruction; 
     private string aiName;
+    private Vrm10Instance vrmInstance;
 
     private List<Content> conversationHistory = new List<Content>(); 
     private bool isAITalking = false; 
@@ -80,7 +82,24 @@ public class UnifiedAIManager : MonoBehaviour
             
             if (loadedData.modelType == CharacterDataAsset.ModelType.VRM_BLENDSHAPE)
             {
-                characterMeshRenderer = characterInstance.GetComponentInChildren<SkinnedMeshRenderer>();
+                SkinnedMeshRenderer[] renderers = characterInstance.GetComponentsInChildren<SkinnedMeshRenderer>();
+        
+                foreach (SkinnedMeshRenderer renderer in renderers)
+                {
+                    if (renderer.gameObject.name.ToLower().Contains("face")) 
+                    {
+                        characterMeshRenderer = renderer;
+                        Debug.Log($"Face SkinnedMeshRenderer found: {renderer.gameObject.name}");
+                        break;
+                    }
+                }
+                
+                vrmInstance = characterInstance.GetComponent<Vrm10Instance>();
+                
+                if (vrmInstance == null)
+                {
+                    Debug.LogError("Vrm10Instance Not found");
+                }
             }
 
             if (characterAnimator != null)
@@ -296,23 +315,32 @@ public class UnifiedAIManager : MonoBehaviour
     
     private void ApplyEmotionToBlendShape(string emotionKey)
     {
-        if (characterMeshRenderer == null || characterMeshRenderer.sharedMesh == null || blendShapeMap == null) return;
-        
+        if (vrmInstance == null || characterMeshRenderer == null || characterMeshRenderer.sharedMesh == null || blendShapeMap == null) return;
         int blendShapeCount = characterMeshRenderer.sharedMesh.blendShapeCount;
         for (int i = 0; i < blendShapeCount; i++)
         {
             characterMeshRenderer.SetBlendShapeWeight(i, 0f); 
         }
-
+        
         if (blendShapeMap.TryGetValue(emotionKey.ToLower(), out EmotionBlendShapeConfig config))
         {
+            Debug.Log($"Loaded Blend Shapes Count for '{emotionKey}': {config.blendShapes.Count}");
             foreach (var pair in config.blendShapes)
             {
-                int blendShapeIndex = characterMeshRenderer.sharedMesh.GetBlendShapeIndex(pair.name);
-                if (blendShapeIndex >= 0)
+                if (string.IsNullOrWhiteSpace(pair.name))
                 {
-                    characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight);
+                    Debug.LogError($"BlendShapePair에 이름이 없습니다. 이 항목을 건너뜁니다.");
+                    continue;
                 }
+                int blendShapeIndex = characterMeshRenderer.sharedMesh.GetBlendShapeIndex(pair.name);
+                float targetWeight = pair.weight / 100.0f;
+                ExpressionKey expressionKey = ExpressionKey.CreateCustom(pair.name); 
+                vrmInstance.Runtime.Expression.SetWeight(expressionKey, targetWeight);
+                
+                characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight); 
+                    
+                //Debug.Log($"VRM Setting: {pair.name} to {targetWeight}");
+                
             }
         }
     }
@@ -323,7 +351,7 @@ public class UnifiedAIManager : MonoBehaviour
         
         if (!loadedData.animatorEmotionMap.ContainsKey(emotionKey))
         {
-            emotionKey = "평온"; 
+            emotionKey = "행복"; 
         }
 
         var emotionStates = loadedData.animatorEmotionMap[emotionKey];
@@ -343,16 +371,18 @@ public class UnifiedAIManager : MonoBehaviour
 
     private string ExtractEmotion(string responseText)
     {
+        //Debug.Log(responseText);
         Match match = Regex.Match(responseText, @"\[(.*?)\]");
         if (match.Success)
         {
             string value = match.Groups[1].Value.Trim();
             Match emotionMatch = Regex.Match(value, @"^(.*?)(?:\[|$)");
             string emotion = emotionMatch.Success ? emotionMatch.Groups[1].Value.Trim().ToLower() : value.ToLower();
-            if (emotion.Contains("복장:")) return "평온";
+            if (emotion.Contains("복장:")) return "행복";
+            //Debug.Log(emotion);
             return emotion;
         }
-        return "평온"; 
+        return "행복"; 
     }
 
     private string ExtractCostume(string responseText)
