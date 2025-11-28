@@ -13,7 +13,7 @@ using System.Linq;
 [System.Serializable] public class Content { public string role; public List<Part> parts; }
 [System.Serializable] public class Candidate { public Content content; }
 [System.Serializable] public class GeminiResponse { public List<Candidate> candidates; }
-[System.Serializable] public class GenerationConfig { public float temperature = 0.8f; public int maxOutputTokens = 512; }
+[System.Serializable] public class GenerationConfig { public float temperature = 0.8f; public int maxOutputTokens = 256; }
 [System.Serializable] public class GeminiRequest { public Content systemInstruction; public List<Content> contents; public GenerationConfig generationConfig; }
 
 public class UnifiedAIManager : MonoBehaviour
@@ -335,9 +335,6 @@ public class UnifiedAIManager : MonoBehaviour
 
         for (int i = 0; i < blendShapeCount; i++)
         {
-            string blendShapeName = characterMeshRenderer.sharedMesh.GetBlendShapeName(i);
-            ExpressionKey expressionKey = ExpressionKey.CreateCustom(blendShapeName);
-            vrmInstance.Runtime.Expression.SetWeight(expressionKey, 0f);
             characterMeshRenderer.SetBlendShapeWeight(i, 0f); 
         }
         
@@ -352,18 +349,13 @@ public class UnifiedAIManager : MonoBehaviour
                     continue;
                 }
                 int blendShapeIndex = characterMeshRenderer.sharedMesh.GetBlendShapeIndex(pair.name);
-                float targetWeight = pair.weight / 100.0f;
                 
-
-                if (blendShapeIndex >= 0)
-                {
-                    ExpressionKey expressionKey = ExpressionKey.CreateCustom(pair.name); 
-                    vrmInstance.Runtime.Expression.SetWeight(expressionKey, targetWeight);
+                Debug.Log($"{pair.name} 재생");
+                
+                characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight); 
                     
-                    characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight); 
-                    
-                    //Debug.Log($"VRM Setting: {pair.name} to {targetWeight}");
-                }
+                //Debug.Log($"VRM Setting: {pair.name} to {targetWeight}");
+                
             }
         }
     }
