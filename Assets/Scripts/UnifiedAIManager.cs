@@ -42,6 +42,8 @@ public class UnifiedAIManager : MonoBehaviour
     public float typingSpeed = 0.05f; 
     private string saveFilePath; 
 
+    public float animationTransitionDuration = 0.25f;
+
     void Start()
     {
         GameObject[] oldModels = GameObject.FindGameObjectsWithTag("CharacterModel");
@@ -226,6 +228,8 @@ public class UnifiedAIManager : MonoBehaviour
     IEnumerator SendRequestCoroutine()
     {
         isAITalking = true;
+        if (inputField != null) inputField.interactable = false;
+        
         GeminiRequest requestPayload = new GeminiRequest { systemInstruction = CreateSystemContent(this.systemInstruction), contents = conversationHistory, generationConfig = new GenerationConfig() };
         string jsonPayload = JsonUtility.ToJson(requestPayload);
         
@@ -271,12 +275,14 @@ public class UnifiedAIManager : MonoBehaviour
                 {
                     HandleFinalAIResponse($"치명적 오류 발생 ({www.responseCode}).");
                     isAITalking = false;
+                    if (inputField != null) inputField.interactable = true;
                     yield break;
                 }
             }
         }
         isAITalking = false;
         HandleFinalAIResponse("죄송해요, 서버가 너무 바빠서 대화가 불가능해요.");
+        if (inputField != null) inputField.interactable = true;
     }
 
     private void HandleFinalAIResponse(string responseText)
@@ -302,11 +308,11 @@ public class UnifiedAIManager : MonoBehaviour
             Debug.Log(talkStateName);
             if (characterAnimator.HasState(0, Animator.StringToHash(talkStateName)))
             {
-                characterAnimator.Play(talkStateName, 0, 0f);
+                characterAnimator.CrossFadeInFixedTime(talkStateName, animationTransitionDuration, 0, 0f);
             }
             else
             {
-                characterAnimator.Play("Idle", 0, 0f);
+                characterAnimator.CrossFadeInFixedTime("Talk", animationTransitionDuration, 0, 0f);
             }
         }
         
@@ -330,7 +336,7 @@ public class UnifiedAIManager : MonoBehaviour
     
     private void ApplyEmotionToBlendShape(string emotionKey)
     {
-        if (vrmInstance == null || characterMeshRenderer == null || characterMeshRenderer.sharedMesh == null || blendShapeMap == null) return;
+        if (characterMeshRenderer == null || characterMeshRenderer.sharedMesh == null || blendShapeMap == null) return;
         int blendShapeCount = characterMeshRenderer.sharedMesh.blendShapeCount;
 
         for (int i = 0; i < blendShapeCount; i++)
@@ -349,13 +355,14 @@ public class UnifiedAIManager : MonoBehaviour
                     continue;
                 }
                 int blendShapeIndex = characterMeshRenderer.sharedMesh.GetBlendShapeIndex(pair.name);
+                float weight_0_100 = pair.weight;
                 
                 Debug.Log($"{pair.name} 재생");
                 
-                characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, pair.weight); 
-                    
-                //Debug.Log($"VRM Setting: {pair.name} to {targetWeight}");
-                
+                if (blendShapeIndex >= 0)
+                {
+                    characterMeshRenderer.SetBlendShapeWeight(blendShapeIndex, weight_0_100); 
+                }
             }
         }
     }
@@ -394,7 +401,6 @@ public class UnifiedAIManager : MonoBehaviour
             Match emotionMatch = Regex.Match(value, @"^(.*?)(?:\[|$)");
             string emotion = emotionMatch.Success ? emotionMatch.Groups[1].Value.Trim().ToLower() : value.ToLower();
             if (emotion.Contains("복장:")) return "행복";
-            //Debug.Log(emotion);
             return emotion;
         }
         return "행복"; 
@@ -416,8 +422,25 @@ public class UnifiedAIManager : MonoBehaviour
 
         if (characterAnimator != null)
         {
+            string emotion = ExtractEmotion(conversationHistory.Last().parts[0].text);
+            string idleStateName = $"{emotion}_Idle";
+            
             Debug.Log("Idle");
-            characterAnimator.Play("Idle", 0, 0f);
+            
+            if (characterAnimator.HasState(0, Animator.StringToHash(idleStateName)))
+            {
+                characterAnimator.CrossFadeInFixedTime(idleStateName, animationTransitionDuration, 0, 0f);
+            }
+            else
+            {
+                characterAnimator.CrossFadeInFixedTime("Idle", animationTransitionDuration, 0, 0f);
+            }
+        }
+
+        if (inputField != null)
+        {
+            inputField.interactable = true;
+            inputField.ActivateInputField();
         }
     }
 }
