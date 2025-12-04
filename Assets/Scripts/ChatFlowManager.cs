@@ -25,13 +25,13 @@ public class ChatFlowManager : MonoBehaviour
         
         if (characterLoader.LoadedData == null) 
         {
-            Debug.LogError("캐릭터 로딩 실패. 씬을 종료합니다.");
+            Debug.LogError("캐릭터 로딩 실패. 씬을 종료");
             return;
         }
         
         if (!chatService.CheckAndLoadApiKey())
         {
-            Debug.LogError("API 키 로드 실패. 환경 변수를 확인하세요.");
+            Debug.LogError("API 키 로드 실패. 환경 변수 check");
             return;
         }
         
@@ -40,11 +40,16 @@ public class ChatFlowManager : MonoBehaviour
             characterLoader.LoadedData.systemInstruction
         );
         
+        chatService.LoadChatHistory(); 
+
         if (chatService.ConversationHistory.Count > 0)
         {
-            string lastResponseWithTags = chatService.ConversationHistory.Last().parts[0].text;
+            var lastContent = chatService.ConversationHistory.Last();
+            string lastResponseWithTags = lastContent.parts[0].text;
+            
             string lastCleanMessage = Regex.Replace(lastResponseWithTags, @"\[.*?\]", "").Trim();
-            outputText.text = lastCleanMessage;
+            
+            outputText.text = lastCleanMessage; 
         }
 
         characterController.Initialize(
@@ -53,8 +58,11 @@ public class ChatFlowManager : MonoBehaviour
             characterLoader.LoadedData,
             animationTransitionDuration
         );
-
-        chatService.LoadChatHistory();
+        
+        if (chatService.ConversationHistory.Count == 0 && outputText != null)
+        {
+             outputText.text = "새로운 대화를 시작합니다.";
+        }
     }
     
     public void ResetChatHistory()
